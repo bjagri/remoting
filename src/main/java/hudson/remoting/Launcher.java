@@ -212,23 +212,21 @@ public class Launcher {
      * Parses the connection arguments from JNLP file given in the URL.
      */
     public List<String> parseJnlpArguments() throws ParserConfigurationException, SAXException, IOException, InterruptedException {
+        HudsonAuthenticator urlAuth = null;
+        if (slaveJnlpCredentials != null) {
+            urlAuth = new HudsonAuthenticator(slaveJnlpCredentials);
+        }
+        
         while (true) {
             try {
-                URLConnection con = slaveJnlpURL.openConnection();
-                if (con instanceof HttpURLConnection && slaveJnlpCredentials != null) {
-                    HttpURLConnection http = (HttpURLConnection) con;
-                    String userPassword = slaveJnlpCredentials;
-                    String encoding = new String(new Base64().encodeBase64(userPassword.getBytes()));
-                    http.setRequestProperty("Authorization", "Basic " + encoding);
-                }
+                HttpURLConnection con = (urlAuth == null) ?
+                        (HttpURLConnection) slaveJnlpURL.openConnection() :
+                        urlAuth.authConnection(slaveJnlpURL);
                 con.connect();
 
-                if (con instanceof HttpURLConnection) {
-                    HttpURLConnection http = (HttpURLConnection) con;
-                    if(http.getResponseCode()>=400)
-                        // got the error code. report that (such as 401)
-                        throw new IOException("Failed to load "+slaveJnlpURL+": "+http.getResponseCode()+" "+http.getResponseMessage());
-                }
+                if(con.getResponseCode()>=400)
+                    // got the error code. report that (such as 401)
+                    throw new IOException("Failed to load "+slaveJnlpURL+": "+con.getResponseCode()+" "+con.getResponseMessage());
 
                 Document dom;
 

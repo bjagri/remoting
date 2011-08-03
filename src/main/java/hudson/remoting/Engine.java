@@ -84,7 +84,7 @@ public class Engine extends Thread {
 
     private final String secretKey;
     public final String slaveName;
-    private String credentials;
+    private HudsonAuthenticator urlAuth;
 
     /**
      * See Main#tunnel in the jnlp-agent module for the details.
@@ -118,7 +118,9 @@ public class Engine extends Thread {
     }
 
     public void setCredentials(String creds) {
-        this.credentials = creds;
+        if (creds != null) {
+            urlAuth = new HudsonAuthenticator(creds);
+        }
     }
 
     public void setNoReconnect(boolean noReconnect) {
@@ -148,11 +150,9 @@ public class Engine extends Thread {
                     URL salURL = new URL(s+"tcpSlaveAgentListener/");
 
                     // find out the TCP port
-                    HttpURLConnection con = (HttpURLConnection)salURL.openConnection();
-                    if (con instanceof HttpURLConnection && credentials != null) {
-                        String encoding = new String(new Base64().encodeBase64(credentials.getBytes()));
-                        con.setRequestProperty("Authorization", "Basic " + encoding);
-                    }
+                    HttpURLConnection con = (urlAuth == null) ?
+                            (HttpURLConnection) salURL.openConnection() :
+                            urlAuth.authConnection(salURL);
                     try {
                         try {
                             con.setConnectTimeout(30000);
@@ -328,7 +328,9 @@ public class Engine extends Thread {
             Thread.sleep(1000*10);
             try {
                 // Hudson top page might be read-protected. see http://www.nabble.com/more-lenient-retry-logic-in-Engine.waitForServerToBack-td24703172.html
-                HttpURLConnection con = (HttpURLConnection)new URL(hudsonUrl,"tcpSlaveAgentListener/").openConnection();
+                    HttpURLConnection con = (urlAuth == null) ?
+                        (HttpURLConnection)new URL(hudsonUrl,"tcpSlaveAgentListener/").openConnection() :
+                        urlAuth.authConnection(hudsonUrl,"tcpSlaveAgentListener/");
                 con.connect();
                 if(con.getResponseCode()==200)
                     return;
